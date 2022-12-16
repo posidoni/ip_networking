@@ -152,7 +152,10 @@ As a result of the work you should provide a report with completed tasks. Each p
 ##### 3) Minimum and maximum host in *12.167.38.4* network with masks: */8*, *11111111.11111111.00000000.00000000*, *255.255.254.0* and */4*
 
 #### 1.2. localhost
-##### Define and write in the report whether an application running on localhost can be accessed with the following IPs: *194.34.23.100*, *127.0.0.2*, *127.1.0.1*, *128.0.0.1*
+##### Define and write in the report whether an application running on localhost can be accessed with the following IPs: 
+*194.34.23.100*, 
+*127.0.0.2*, 
+*127.1.0.1*, *128.0.0.1*
 
 #### 1.3. Network ranges and segments
 ##### Define and write in a report:
