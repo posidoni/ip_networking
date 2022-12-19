@@ -953,3 +953,70 @@ Escape character is '^]'.
 
 ## 8. SSH Tunnels
 
+[Tutorial](https://habr.com/ru/post/331348/)
+
+### Run apache on `localhost:80` WS22
+
+``` bash
+posidoni@ws22:~$ sudo service apache2 status
+● apache2.service - The Apache HTTP Server
+     Loaded: loaded (/lib/systemd/system/apache2.service; enabled; vendor preset: enabled)
+     Active: active (running) since Mon 2022-12-19 14:10:45 UTC; 2min 1s ago
+       Docs: https://httpd.apache.org/docs/2.4/
+    Process: 3667 ExecStart=/usr/sbin/apachectl start (code=exited, status=0/SUCCESS)
+   Main PID: 3671 (apache2)
+      Tasks: 55 (limit: 1030)
+     Memory: 4.7M
+        CPU: 66ms
+     CGroup: /system.slice/apache2.service
+             ├─3671 /usr/sbin/apache2 -k start
+             ├─3672 /usr/sbin/apache2 -k start
+             └─3673 /usr/sbin/apache2 -k start
+```
+
+### Local TCP Forwarding (WS1 --> WS2)
+
+```bash
+posidoni@ws21:~$ curl ws22
+curl: (7) Failed to connect to ws22 port 80 after 8 ms: Connection refused
+
+In /etc/ssh/sshd.conf uncomment:
+AllowTcpForwarding yes
+
+posidoni@ws21:~$ ssh -L 8080:localhost:80 ws22
+# this logins us into ssh, but on our machine apache starts
+# listening on port 8080
+
+# although we did not have apache on WS21
+posidoni@ws21:~$ telnet localhost 8080 # <- yay! everything works
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+d
+HTTP/1.1 400 Bad Request
+Date: Mon, 19 Dec 2022 14:29:18 GMT
+Server: Apache/2.4.52 (Ubuntu)
+Content-Length: 302
+Connection: close
+Content-Type: text/html; charset=iso-8859-1
+```
+
+### Remote TCP Forwarding (WS2 --> WS1)
+
+```bash
+posidoni@ws22:~$ ssh -R 9999:localhost:80 ws21
+
+posidoni@ws21:~$ telnet localhost 9999
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+f
+HTTP/1.1 400 Bad Request
+Date: Mon, 19 Dec 2022 14:33:23 GMT
+Server: Apache/2.4.52 (Ubuntu)
+Content-Length: 302
+Connection: close
+Content-Type: text/html; charset=iso-8859-1
+
+```
+
