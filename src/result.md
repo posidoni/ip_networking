@@ -19,15 +19,25 @@
 
 - Public - all other
 
-## NAT
+## Default gateway
 
-NAT = network address translation. This is a system that alters
-IP packet headers and changes source/destination. SNAT/DNAT.
+A default gateway is the node in a computer network using the Internet protocol suite that serves as the forwarding host (router) to other networks when no other route specification matches the destination IP address of a packet.
 
-## Tools
+## Questions:
 
-- netstat
-- nmap
+1. When we use netplan to assign statis ip, we must set mask. Why do we need mask? Networks are like streets, ip addresses (host addressess) are like houses numbers.
+In order to find someone we need both the street and house number.
+
+## Takeaways
+
+1. When the subnetwork is not specified, it is implicitly set to `/0`,
+so when we take any private address it is taken from all available
+addresses.
+
+2. Each subnetting divides network by 2, because this is how bitmasks
+work.
+
+3. Host id - host number in local network or network interface name
 
 ## 1.1
 
@@ -380,6 +390,21 @@ PING 192.168.100.10 (192.168.100.10) 56(84) bytes of data.
 
 ## 5. Network configuration
 
+
+### `/etc/hosts` file
+
+- Hosts make networking easier and allow us to make name aliases for VMs. After this primarily host names will be used.
+```
+───────┬──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+       │ File: /etc/hosts (example)
+───────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   4   │ 127.0.0.1   localhost
+   7   │ 10.8.60.78  host.docker.internal
+   8   │ 10.8.60.78  gateway.docker.internal
+   9   │ 127.0.0.1   kubernetes.docker.internal
+───────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+```
+
 VB config:
 ```
 networks:
@@ -450,8 +475,28 @@ net.ipv4.ip_forward=1
 
 ### Default route configuration
 
+```
+posidoni@r1:~$ ip r
+default via 10.0.2.2 dev enp0s3 proto dhcp src 10.0.2.15 metric 100
+10.0.2.0/24 dev enp0s3 proto kernel scope link src 10.0.2.15 metric 100
+10.0.2.2 dev enp0s3 proto dhcp scope link src 10.0.2.15 metric 100
+10.8.60.1 via 10.0.2.2 dev enp0s3 proto dhcp src 10.0.2.15 metric 100
+10.10.0.0/16 dev enp0s8 proto kernel scope link src 10.10.0.1
+10.10.0.0/16 via 10.10.0.1 dev enp0s8 proto static
+10.20.0.0/26 via 10.100.0.12 dev enp0s9 proto static
+10.100.0.0/18 dev enp0s9 proto kernel scope link src 10.100.0.11
+10.100.0.0/18 via 10.100.0.11 dev enp0s9 proto static
 
-### WS1 <-> R2
+default via 10.0.2.2 dev enp0s3 proto dhcp src 10.0.2.15 metric 100
+10.0.2.0/24 dev enp0s3 proto kernel scope link src 10.0.2.15 metric 100
+10.0.2.2 dev enp0s3 proto dhcp scope link src 10.0.2.15 metric 100
+10.8.60.1 via 10.0.2.2 dev enp0s3 proto dhcp src 10.0.2.15 metric 100
+10.10.0.0/18 via 10.100.0.11 dev enp0s9 proto static
+10.20.0.0/26 dev enp0s8 proto kernel scope link src 10.20.0.1
+10.20.0.0/26 via 10.20.0.1 dev enp0s8 proto static
+10.100.0.0/16 dev enp0s9 proto kernel scope link src 10.100.0.12
+10.100.0.0/16 via 10.100.0.12 dev enp0s9 proto static
+```
 
 ### Adding static routes
 
@@ -528,18 +573,18 @@ network: #r1
     enp0s8: # r1p network
       dhcp4: false
       addresses:
-        - 10.10.0.1/16
+        - 10.10.0.1/18
       routes:
-        - to: 10.10.0.0/16 # to communicate with my network
+        - to: 10.10.0.0/18 # to communicate with my network
           via: 10.10.0.1   # I can sent packets via myself
         - to: 10.100.0.0/16
           via: 10.100.0.11
     enp0s9: # shared network
       dhcp4: false
       addresses:
-        - 10.100.0.11/18
+        - 10.100.0.11/16
       routes:
-        - to: 10.100.0.0/18 # to communicate with my network
+        - to: 10.100.0.0/16 # to communicate with my network
           via: 10.100.0.11  # use me
         - to: 10.20.0.0/26
           via: 10.100.0.12
@@ -606,37 +651,305 @@ PING ws22 (10.20.0.20) 56(84) bytes of data.
 rtt min/avg/max/mdev = 2.982/5.958/8.934/2.976 ms
 ```
 
+### Making a router list
 
-## Hosts file
-
-- Hosts make networking easier and allow us to make name aliases for VMs
 ```
-───────┬──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-       │ File: /etc/hosts
-───────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-   4   │ 127.0.0.1   localhost
-   7   │ 10.8.60.78  host.docker.internal
-   8   │ 10.8.60.78  gateway.docker.internal
-   9   │ 127.0.0.1   kubernetes.docker.internal
-───────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+posidoni@ws11:~$ traceroute ws22
+traceroute to ws22 (10.20.0.20), 30 hops max, 60 byte packets
+ 1  r1 (10.10.0.1)  13.750 ms  13.414 ms  13.402 ms
+ 2  r2 (10.100.0.12)  16.809 ms  22.538 ms  22.530 ms
+ 3  ws22 (10.20.0.20)  22.522 ms  27.310 ms  27.303 ms
+
+
+posidoni@r1:~$ sudo tcpdump -tnv -i enp0s8
+tcpdump: listening on enp0s8, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+IP (tos 0x0, ttl 1, id 10766, offset 0, flags [none], proto UDP (17), length 60)
+    10.10.0.2.53278 > 10.20.0.20.33434: UDP, length 32
+IP (tos 0xc0, ttl 64, id 7611, offset 0, flags [none], proto ICMP (1), length 88)
+    10.10.0.1 > 10.10.0.2: ICMP time exceeded in-transit, length 68
+        IP (tos 0x0, ttl 1, id 10766, offset 0, flags [none], proto UDP (17), length 60)
+    10.10.0.2.53278 > 10.20.0.20.33434: UDP, length 32
+IP (tos 0x0, ttl 1, id 47919, offset 0, flags [none], proto UDP (17), length 60)
+    10.10.0.2.50935 > 10.20.0.20.33435: UDP, length 32
+IP (tos 0x0, ttl 1, id 60789, offset 0, flags [none], proto UDP (17), length 60)
+    10.10.0.2.52756 > 10.20.0.20.33436: UDP, length 32
+IP (tos 0xc0, ttl 64, id 7612, offset 0, flags [none], proto ICMP (1), length 88)
+    10.10.0.1 > 10.10.0.2: ICMP time exceeded in-transit, length 68
+        IP (tos 0x0, ttl 1, id 47919, offset 0, flags [none], proto UDP (17), length 60)
+                                ...
 ```
 
-## Default gateway
+### Using __ICMP__ protocol in routing
 
-A default gateway is the node in a computer network using the Internet protocol suite that serves as the forwarding host (router) to other networks when no other route specification matches the destination IP address of a packet.
+```
+posidoni@ws11:~$ ping -c 1 10.30.0.111
+PING 10.30.0.111 (10.30.0.111) 56(84) bytes of data.
 
-## Questions:
+--- 10.30.0.111 ping statistics ---
+1 packets transmitted, 0 received, 100% packet loss, time 0ms
 
-1. When we use netplan to assign statis ip, we must set mask. Why do we need mask? Networks are like streets, ip addresses (host addressess) are like houses numbers.
-In order to find someone we need both the street and house number.
 
-## Takeaways
+posidoni@r1:~$ sudo tcpdump -tnv -i enp0s8
+tcpdump: listening on enp0s8, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+IP (tos 0x0, ttl 64, id 16792, offset 0, flags [DF], proto ICMP (1), length 84)
+    10.10.0.2 > 10.30.0.111: ICMP echo request, id 55, seq 1, length 64
+IP6 (flowlabel 0xc9aa0, hlim 255, next-header ICMPv6 (58) payload length: 16) fe80::a00:27ff:fe60:eec0 > ff02::2: [icmp6 sum ok] ICMP6, router solicitation, length 16
+          source link-address option (1), length 8 (1): 08:00:27:60:ee:c0
+ARP, Ethernet (len 6), IPv4 (len 4), Request who-has 10.10.0.1 tell 10.10.0.2, length 46
+ARP, Ethernet (len 6), IPv4 (len 4), Reply 10.10.0.1 is-at 08:00:27:cb:61:15, length 28
+```
 
-1. When the subnetwork is not specified, it is implicitly set to `/0`,
-so when we take any private address it is taken from all available
-addresses.
+### 6. Dynamic IP configuration using __DHCP__
 
-2. Each subnetting divides network by 2, because this is how bitmasks
-work.
+Starting DHCP server
+```
+posidoni@r2:~$ sudo vim /etc/dhcp/dhcpd.conf
+posidoni@r2:~$ sudo vim /etc/resolv.conf
+posidoni@r2:~$ tail /etc/resolv.conf
+nameserver 127.0.0.53
+options edns0 trust-ad
+search .
 
-3. Host id - host number in local network or network interface name
+nameserver 8.8.8.8
+
+posidoni@r2:~$ sudo systemctl restart isc-dhcp-server
+posidoni@r2:~$ sudo systemctl status isc-dhcp-server
+● isc-dhcp-server.service - ISC DHCP IPv4 server
+     Loaded: loaded (/lib/systemd/system/isc-dhcp-server.service; enabled; vendor preset: enabled)
+     Active: active (running) since Mon 2022-12-19 09:26:07 UTC; 6s ago
+       Docs: man:dhcpd(8)
+   Main PID: 4618 (dhcpd)
+      Tasks: 4 (limit: 1030)
+     Memory: 4.5M
+        CPU: 19ms
+     CGroup: /system.slice/isc-dhcp-server.service
+             └─4618 dhcpd -user dhcpd -group dhcpd -f -4 -pf /run/dhcp-server/dhcpd.pid -cf /etc/dhcp/dhcpd.conf
+```
+
+Getting IP by DHCP clients
+```
+posidoni@ws21:~$ sudo netplan apply
+posidoni@ws21:~$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: enp0s3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 08:00:27:08:8c:75 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.2.15/24 metric 100 brd 10.0.2.255 scope global dynamic enp0s3
+       valid_lft 86400sec preferred_lft 86400sec
+    inet6 fe80::a00:27ff:fe08:8c75/64 scope link
+       valid_lft forever preferred_lft forever
+3: enp0s8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 08:00:27:3c:a9:07 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::a00:27ff:fe3c:a907/64 scope link
+       valid_lft forever preferred_lft forever
+posidoni@ws21:~$ ping ws22
+PING ws22 (10.20.0.20) 56(84) bytes of data.
+64 bytes from ws22 (10.20.0.20): icmp_seq=1 ttl=64 time=3.72 ms
+64 bytes from ws22 (10.20.0.20): icmp_seq=2 ttl=64 time=1.19 ms
+```
+
+### Configuring MAC for WS11
+
+1. Enable DHCP in netplan config (DO NOT remove routes)
+
+```yaml
+network: # ws1
+  version: 2
+  ethernets:
+    enp0s3:
+      dhcp4: true
+    enp0s8:
+      dhcp4: true
+      macaddress: 10:10:10:10:10:BA
+      addresses:
+        - 10.10.0.2/18
+      routes:
+        - to: default # in order to speak with anyone
+          via: 10.10.0.1 # route via default gateway of my network
+        - to: 10.10.0.0/18 # to communicate with my network
+          via: 10.10.0.2 # I can sent packets via myself
+```
+
+Checking DH Client:
+```bash
+posidoni@ws11:~$ sudo dhclient -v
+Internet Systems Consortium DHCP Client 4.4.1
+Copyright 2004-2018 Internet Systems Consortium.
+All rights reserved.
+For info, please visit https://www.isc.org/software/dhcp/
+
+Listening on LPF/enp0s8/10:10:10:10:10:ba <--- changed mac (*)
+Sending on   LPF/enp0s8/10:10:10:10:10:ba
+Listening on LPF/enp0s3/08:00:27:08:8c:75
+Sending on   LPF/enp0s3/08:00:27:08:8c:75
+Sending on   Socket/fallback
+DHCPDISCOVER on enp0s8 to 255.255.255.255 port 67 interval 3 (xid=0xaea1b468)
+DHCPDISCOVER on enp0s3 to 255.255.255.255 port 67 interval 3 (xid=0x580d5f2f)
+DHCPDISCOVER on enp0s3 to 255.255.255.255 port 67 interval 6 (xid=0x580d5f2f)
+DHCPOFFER of 10.0.2.15 from 10.0.2.2
+DHCPREQUEST for 10.0.2.15 on enp0s3 to 255.255.255.255 port 67 (xid=0x2f5f0d58)
+DHCPACK of 10.0.2.15 from 10.0.2.2 (xid=0x580d5f2f)
+RTNETLINK answers: File exists
+bound to 10.0.2.15 -- renewal in 34220 seconds. <----- (*)
+```
+
+Configuring DHCP for R1
+```
+subnet 10.10.0.0 netmask 255.255.192.0
+{
+    range 10.10.0.1 10.10.63.254;
+    option routers 10.10.0.1;
+    option domain-name-servers 10.20.0.1;
+        host ws11 { # <--- configuring IP by MAC
+                hardware ethernet 10:10:10:10:10:BA;
+                fixed-address 10.10.42.42;
+        }
+
+}
+
+posidoni@r1:~$ sudo vim /etc/dhcp/dhcpd.conf
+posidoni@r1:~$ sudo systemctl restart isc-dhcp-server
+posidoni@r1:~$ sudo journalctl -u isc-dhcp-server
+
+Dec 19 10:11:02 r1 sh[5080]: Listening on LPF/enp0s8/08:00:27:cb:61:15/10.10.0.0/18
+Dec 19 10:11:02 r1 sh[5080]: Sending on   LPF/enp0s8/08:00:27:cb:61:15/10.10.0.0/18
+
+Dec 19 11:51:45 r1 dhcpd[6148]: DHCPREQUEST for 10.10.0.20 (10.10.0.1) from 00:00:00:00:00:ba (ws11) via enp0s8
+Dec 19 11:51:45 r1 dhcpd[6148]: DHCPACK on 10.10.0.20 to 00:00:00:00:00:ba (ws11) via enp0s8 <-- we see, that respective rule applied
+
+Ping works:
+
+PING r1 (10.10.0.1) 56(84) bytes of data.
+64 bytes from r1 (10.10.0.1): icmp_seq=1 ttl=64 time=12.8 ms
+^C
+--- r1 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 12.790/12.790/12.790/0.000 ms
+posidoni@ws11:~$ ping r2
+PING r2 (10.100.0.12) 56(84) bytes of data.
+64 bytes from r2 (10.100.0.12): icmp_seq=1 ttl=63 time=13.6 ms
+^C
+--- r2 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 13.553/13.553/13.553/0.000 ms
+posidoni@ws11:~$ ping ws21
+PING ws21 (10.20.0.10) 56(84) bytes of data.
+64 bytes from ws21 (10.20.0.10): icmp_seq=1 ttl=62 time=14.7 ms
+64 bytes from ws21 (10.20.0.10): icmp_seq=2 ttl=62 time=15.8 ms
+^C
+--- ws21 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1002ms
+rtt min/avg/max/mdev = 14.720/15.256/15.793/0.536 ms
+```
+
+## 7. NAT
+
+1. Change apache config
+```
+Listen 0.0.0.0.80
+<IfModule ssl_module>
+        Listen 443
+</IfModule>
+
+<IfModule mod_gnutls.c>
+        Listen 443
+</IfModule>
+```
+2. Start apache
+`posidoni@ws22:~$ sudo service apache2 start`
+
+3. Creaete firewall rules
+
+```bash
+#/bin/bash
+iptables -F
+iptables -F -t nat
+iptables -P FORWARD DROP
+iptables -A FORWARD -p icmp -j ACCEPT # allows all ICMP forwarded packets
+```
+
+4. Check connection ws22 <-> r1
+
+Firewall from subject did not work. I had to modify it. The idea
+is to by default block all input and allow input only from local
+network. SSH is enabled for my convenience.
+
+`$ iptables -P INPUT DROP`
+`$ iptables -A INPUT -s 10.20.0.0/26 -p all -j ACCEPT`
+`$ iptables -t filter -A INPUT -p tcp -m tcp --dport ssh -j ACCEPT`
+
+```
+posidoni@r1:~$ ping 10.20.0.20
+PING 10.20.0.20 (10.20.0.20) 56(84) bytes of data.
+--- 10.20.0.20 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1027ms
+
+posidoni@r1:~$ curl 10.20.0.20 # doesn't work
+```
+
+5. Enable routing of all ICMP packets
+
+`$ iptables -t filter -A INPUT -p icmp -j ACCEPT`
+
+```txt
+posidoni@r1:~$ ping 10.20.0.20 # <-- ping works
+PING 10.20.0.20 (10.20.0.20) 56(84) bytes of data.
+64 bytes from 10.20.0.20: icmp_seq=1 ttl=63 time=12.7 ms
+64 bytes from 10.20.0.20: icmp_seq=2 ttl=63 time=2.11 ms
+--- 10.20.0.20 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1001ms
+rtt min/avg/max/mdev = 2.112/7.421/12.730/5.309 ms
+
+posidoni@r1:~$ curl 10.20.0.20 # <-- but curl still doesnt
+```
+
+5. Enable SNAT
+
+[Tutorial](https://www.karlrupp.net/en/computer/nat_tutorial)
+
+```bash
+# MASQUERADE = replace sender addr with router addr
+
+# This must be enabled on r2, because r2 is
+# router for ws22
+
+$ sudo iptables -t nat -A POSTROUTING  -j MASQUERADE
+# alternative: $ sudo 
+```
+
+- after this `curl` works
+
+6. Enable DNAT on ws22 ( port 8080 -> 80 )
+
+``` bash
+$ iptables -t nat -A PREROUTING -p TCP --dport 8080 -j REDIRECT --to-port 80
+```
+
+7. Telnet checks
+
+```bash
+# R1 -> WS22
+posidoni@r1:~$ telnet 10.20.0.20 80 (ws22)
+Trying 10.20.0.20...
+Connected to 10.20.0.20.
+Escape character is '^]'.
+
+# R2 -> WS22
+posidoni@r2:~$ telnet 10.20.0.20 80
+Trying 10.20.0.20...
+Connected to 10.20.0.20.
+Escape character is '^]'.
+^]
+telnet> Connection closed.
+posidoni@r2:~$ telnet 10.20.0.20 8080
+Trying 10.20.0.20...
+Connected to 10.20.0.20.
+Escape character is '^]'.
+```
+
+## 8. SSH Tunnels
+
