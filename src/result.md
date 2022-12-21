@@ -23,25 +23,12 @@
 
 A default gateway is the node in a computer network using the Internet protocol suite that serves as the forwarding host (router) to other networks when no other route specification matches the destination IP address of a packet.
 
-## Questions:
-
-1. When we use netplan to assign statis ip, we must set mask. Why do we need mask? Networks are like streets, ip addresses (host addressess) are like houses numbers.
-In order to find someone we need both the street and house number.
-
-## Takeaways
-
-1. When the subnetwork is not specified, it is implicitly set to `/0`,
-so when we take any private address it is taken from all available
-addresses.
-
-2. Each subnetting divides network by 2, because this is how bitmasks
-work.
-
-3. Host id - host number in local network or network interface name
 
 ## 1.1
 
 1) ❯ ipcalc 129.167.38.54/13
+
+```txt
 Address:   129.167.38.54        10000001.10100 111.00100110.00110110
 Netmask:   255.248.0.0 = 13     11111111.11111 000.00000000.00000000
 Wildcard:  0.7.255.255          00000000.00000 111.11111111.11111111
@@ -51,8 +38,10 @@ HostMin:   129.160.0.1          10000001.10100 000.00000000.00000001
 HostMax:   129.167.255.254      10000001.10100 111.11111111.11111110
 Broadcast: 129.167.255.255      10000001.10100 111.11111111.11111111
 Hosts/Net: 524286                Class B
+```
 
 2) Conversion of the mask
+```
 1. 255.255.255.0:
     prefix - 24
     binary: 1111 1111 . 1111 1111 . 1111 1111 . 0000 0000
@@ -73,13 +62,16 @@ Hosts/Net: 524286                Class B
     * /4:
     HostMin:   0.0.0.1              0000 0000.00000000.00000000.00000001
     HostMax:   15.255.255.254       0000 1111.11111111.11111111.11111110
+```
 
 ## 1.2 Localhost
 
+```
 * [24-bit-block] 10.0.0.0       - 10.255.255.255
 * [20-bit-block] 172.16.0.0     - 172.31.255.255
 * [16-bit-block] 192.168.0.0    - 192.168.255.255
 * [loopback]     127.0.0.0      - 127.255.255.255
+```
 
 - 194.34.23.100 (-)
 - 127.0.0.2 (+)
@@ -89,6 +81,7 @@ Hosts/Net: 524286                Class B
 ## 1.3 Network ranges and segments
 
 ##### 1) which of the listed IPs can be used as public and which only as private: 
+
 - *10.0.0.45* (priv)
 - *134.43.0.2* (pub)
 - *192.168.4.2* (priv)
@@ -103,7 +96,7 @@ Hosts/Net: 524286                Class B
 
 ##### 2) which of the listed gateway IP addresses are possible for *10.10.0.0/18* network:
 
-
+```
 Address:   10.10.0.0            00001010.00001010.00 000000.00000000
 Netmask:   255.255.192.0 = 18   11111111.11111111.11 000000.00000000
 Wildcard:  0.0.63.255           00000000.00000000.00 111111.11111111
@@ -113,12 +106,13 @@ HostMin:   10.10.0.1            00001010.00001010.00 000000.00000001
 HostMax:   10.10.63.254         00001010.00001010.00 111111.11111110
 Broadcast: 10.10.63.255         00001010.00001010.00 111111.11111111
 Hosts/Net: 16382                 Class A, Private Internet
+```
 
-*10.0.0.1* (+)
-*10.10.0.2* (+)
-*10.10.10.10* (+)
-*10.10.100.1* (-)
-*10.10.1.255* (+)
+- 10.0.0.1 (+)
+- 10.10.0.2 (+)
+- 10.10.10.10 (+)
+- 10.10.100.1 (-)
+- 10.10.1.255 (+)
 
 ## 2 - Static routing
 
@@ -129,7 +123,7 @@ Hosts/Net: 16382                 Class A, Private Internet
 * enp0s8 - internal network of VMs
 
 ws1
-```
+```bash
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
     inet 127.0.0.1/8 scope host lo
@@ -151,7 +145,7 @@ ws1
 ```
 
 ws2
-```
+```bash
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
     inet 127.0.0.1/8 scope host lo
@@ -183,7 +177,7 @@ network:
 `$ netplan apply` (no output)
 
 ws2
-```
+```yaml
 network:
   version: 2
   ethernets:
@@ -280,12 +274,11 @@ rtt min/avg/max/mdev = 0.879/1.331/1.784/0.452 ms
 
 3.1) Conversion:
 - 8 Mbps -> 1 MB (because 1 bit = 8 bytes)
-- 100 MB -> 102,400 Kbps
 - 1 Gbps -> 1000 Mbps
 
 3.2) Measure connection speed between WS1 and WS2:
 
-```
+```bash
 posidoni@ws11:~$ iperf3 -s -f K # start listener on WS1
 posidoni@ws21:~$ iperf3 -c 192.168.100.10 # connect to WS1 from WS2
 -----------------------------------------------------------
@@ -406,7 +399,7 @@ PING 192.168.100.10 (192.168.100.10) 56(84) bytes of data.
 ```
 
 VB config:
-```
+```txt
 networks:
 r1p (r1 private): WS1
 r2p (r2 private): WS21, WS22
@@ -414,10 +407,12 @@ rsh (shared): r1, r2
 ```
 
 Step one:
-ws1 -> r1
-ws21 <-> r2 <-> ws22
+```
+ws1 ---> r1
+ws21 <---> r2 <---> ws22
 
-r1 !<->!r2 (r1 does not communicate with r2 yet)
+r1 !>---x---<! r2 (r1 does not communicate with r2 yet)
+```
 
 ```yaml
 network: #ws1
@@ -430,7 +425,7 @@ network: #ws1
         - 10.10.0.2/18
       routes:
         - to: 10.10.0.0/18 # to communicate with my network
-          via: 10.10.0.2 # I can sent packets via myself
+          via: 10.10.0.2 # I can send packets via myself
         - to: default # in order to speak with anyone
           via: 10.10.0.1/18 # route via default gateway of my network
 network: #r1
@@ -444,7 +439,7 @@ network: #r1
         - 10.10.0.1/18
       routes:
         - to: 10.10.0.0/18 # to communicate with my network
-          via: 10.10.0.1 # I can sent packets via myself
+          via: 10.10.0.1 # I can send packets via myself
         - to: default # in order to speak with anyone
           via: 10.100.0.11/16 # route through my shared interface
     enp0s9: # shared network
@@ -534,7 +529,7 @@ network: # ws1
         - to: default # in order to speak with anyone
           via: 10.10.0.1 # route via default gateway of my network
         - to: 10.10.0.0/18 # to communicate with my network
-          via: 10.10.0.2 # I can sent packets via myself
+          via: 10.10.0.2 # I can send packets via myself
 network: # WS21
   version: 2
   ethernets:
@@ -576,7 +571,7 @@ network: #r1
         - 10.10.0.1/18
       routes:
         - to: 10.10.0.0/18 # to communicate with my network
-          via: 10.10.0.1   # I can sent packets via myself
+          via: 10.10.0.1   # I can send packets via myself
         - to: 10.100.0.0/16
           via: 10.100.0.11
     enp0s9: # shared network
@@ -771,7 +766,7 @@ network: # ws1
         - to: default # in order to speak with anyone
           via: 10.10.0.1 # route via default gateway of my network
         - to: 10.10.0.0/18 # to communicate with my network
-          via: 10.10.0.2 # I can sent packets via myself
+          via: 10.10.0.2 # I can send packets via myself
 ```
 
 Checking DH Client:
